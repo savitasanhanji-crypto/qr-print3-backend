@@ -1,0 +1,1 @@
+const bcrypt=require("bcryptjs");const hash="$2b$10$hp50rYWo30n4.x5YB5pIJerzwqvz2keGWhvYY15EBXafPMrV1OjNe";bcrypt.compare("1234",hash).then(r=>console.log("Match:",r));

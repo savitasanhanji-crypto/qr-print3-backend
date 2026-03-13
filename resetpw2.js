@@ -1,0 +1,1 @@
+const bcrypt=require("bcryptjs");const mongoose=require("mongoose");require("dotenv").config();mongoose.connect(process.env.MONGO_URI).then(async()=>{const hash=await bcrypt.hash("1234",10);await mongoose.connection.db.collection("Conductor").updateOne({batch_no:"121212"},{"$set":{password:hash}});console.log("Done");process.exit();});

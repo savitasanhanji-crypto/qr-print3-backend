@@ -1,0 +1,1 @@
+const mongoose=require("mongoose");require("dotenv").config();mongoose.connect(process.env.MONGO_URI).then(async()=>{const c=await mongoose.connection.db.collection("conductors").find({batch_no:"121212"}).toArray();console.log(JSON.stringify(c,null,2));process.exit();});
