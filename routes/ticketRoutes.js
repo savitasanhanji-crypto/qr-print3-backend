@@ -23,7 +23,6 @@ const PosMachine = mongoose.model("posmachines", new mongoose.Schema({
 const Route = mongoose.model("routes", new mongoose.Schema({
   source: String,
   destination: String,
-  routeNumber: String,
   via: String,
 }, { collection: "routes" }));
 
@@ -42,23 +41,29 @@ router.post("/", async (req, res) => {
 
     // Get bus document
     const bus = await Bus.findOne({ busNumber }).catch(() => null);
+    console.log("Bus found:", bus);
 
     if (bus) {
-      // Get route number from busroutes
+      // Get route from busroutes
       const busRoute = await BusRoute.findOne({ bus: bus._id }).catch(() => null);
+      console.log("BusRoute found:", busRoute);
       if (busRoute) {
         const route = await Route.findById(busRoute.route).catch(() => null);
+        console.log("Route found:", route);
         if (route) {
-          routeNumber = route.routeNumber || route.source + "-" + route.destination;
+          // Use source-destination as route number
+          routeNumber = `${route.source}-${route.destination}`;
         }
       }
 
       // Get machine ID from buspos
       const busPos = await BusPos.findOne({ bus: bus._id }).catch(() => null);
+      console.log("BusPos found:", busPos);
       if (busPos) {
         const posMachine = await PosMachine.findById(busPos.posMachine).catch(() => null);
+        console.log("PosMachine found:", posMachine);
         if (posMachine) {
-          machineId = posMachine.machineId || posMachine.serialNumber || 
+          machineId = posMachine.machineId || posMachine.serialNumber ||
                       posMachine._id.toString().slice(-8).toUpperCase();
         }
       }
@@ -72,7 +77,7 @@ router.post("/", async (req, res) => {
     }).catch(() => 0);
     const serial = String(todayCount + 1).padStart(5, "0");
 
-    // Ticket number format: SUR-YYYYMMDD-MID-XXXXX
+    // Ticket number: SUR-YYYYMMDD-MID-XXXXX
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const midPart = machineId ? machineId.slice(-4) : "00";
     const ticketNumber = `SUR-${dateStr}-${midPart}-${serial}`;
