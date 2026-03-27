@@ -3,7 +3,6 @@ const router = express.Router();
 const Ticket = require("../models/Ticket");
 const mongoose = require("mongoose");
 
-// Dynamic models for existing collections
 const BusRoute = mongoose.model("busroutes", new mongoose.Schema({
   bus: mongoose.Schema.Types.ObjectId,
   route: mongoose.Schema.Types.ObjectId,
@@ -36,12 +35,10 @@ const Bus = mongoose.model("buses", new mongoose.Schema({
 // POST /api/tickets
 router.post("/", async (req, res) => {
   try {
-    const { busNumber, batch_no, conductorId } = req.body;
+    const { busNumber } = req.body;
 
     let routeNumber = "";
     let machineId = "";
-    let tripNumber = "1";
-    let seatNumber = "1";
 
     // Get bus document
     const bus = await Bus.findOne({ busNumber }).catch(() => null);
@@ -52,7 +49,7 @@ router.post("/", async (req, res) => {
       if (busRoute) {
         const route = await Route.findById(busRoute.route).catch(() => null);
         if (route) {
-          routeNumber = route.routeNumber || route._id.toString().slice(-6).toUpperCase();
+          routeNumber = route.routeNumber || route.source + "-" + route.destination;
         }
       }
 
@@ -61,32 +58,30 @@ router.post("/", async (req, res) => {
       if (busPos) {
         const posMachine = await PosMachine.findById(busPos.posMachine).catch(() => null);
         if (posMachine) {
-          machineId = posMachine.machineId || posMachine.serialNumber || posMachine._id.toString().slice(-8).toUpperCase();
+          machineId = posMachine.machineId || posMachine.serialNumber || 
+                      posMachine._id.toString().slice(-8).toUpperCase();
         }
       }
     }
 
-    // Get today's ticket count for seat number
+    // Get today's running serial
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayCount = await Ticket.countDocuments({
       dateTime: { $gte: today },
-      busNumber,
     }).catch(() => 0);
-    seatNumber = String(todayCount + 1).padStart(3, "0");
+    const serial = String(todayCount + 1).padStart(5, "0");
 
-    // Generate ticket number: BUS-[RouteId]-[Date]-[Trip]-[Seat]
+    // Ticket number format: SUR-YYYYMMDD-MID-XXXXX
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const routePart = routeNumber || "000";
-    const ticketNumber = `BUS-${routePart}-${dateStr}-${tripNumber}-${seatNumber}`;
+    const midPart = machineId ? machineId.slice(-4) : "00";
+    const ticketNumber = `SUR-${dateStr}-${midPart}-${serial}`;
 
     const ticketData = {
       ...req.body,
       ticketNumber,
       routeNumber,
       machineId,
-      tripNumber,
-      seatNumber,
     };
 
     const ticket = new Ticket(ticketData);
