@@ -3,12 +3,6 @@ const router = express.Router();
 const Ticket = require("../models/Ticket");
 const mongoose = require("mongoose");
 
-const BusRoute = mongoose.model("busroutes", new mongoose.Schema({
-  bus: mongoose.Schema.Types.ObjectId,
-  route: mongoose.Schema.Types.ObjectId,
-  status: String,
-}, { collection: "busroutes" }));
-
 const BusPos = mongoose.model("buspos", new mongoose.Schema({
   bus: mongoose.Schema.Types.ObjectId,
   posMachine: mongoose.Schema.Types.ObjectId,
@@ -20,12 +14,6 @@ const PosMachine = mongoose.model("posmachines", new mongoose.Schema({
   name: String,
 }, { collection: "posmachines" }));
 
-const Route = mongoose.model("routes", new mongoose.Schema({
-  source: String,
-  destination: String,
-  via: String,
-}, { collection: "routes" }));
-
 const Bus = mongoose.model("buses", new mongoose.Schema({
   busNumber: String,
   name: String,
@@ -36,32 +24,17 @@ router.post("/", async (req, res) => {
   try {
     const { busNumber } = req.body;
 
-    let routeNumber = "";
+    let routeNumber = busNumber || "";
     let machineId = "";
 
     // Get bus document
     const bus = await Bus.findOne({ busNumber }).catch(() => null);
-    console.log("Bus found:", bus);
 
     if (bus) {
-      // Get route from busroutes
-      const busRoute = await BusRoute.findOne({ bus: bus._id }).catch(() => null);
-      console.log("BusRoute found:", busRoute);
-      if (busRoute) {
-        const route = await Route.findById(busRoute.route).catch(() => null);
-        console.log("Route found:", route);
-        if (route) {
-          // Use source-destination as route number
-          routeNumber = `${route.source}-${route.destination}`;
-        }
-      }
-
       // Get machine ID from buspos
       const busPos = await BusPos.findOne({ bus: bus._id }).catch(() => null);
-      console.log("BusPos found:", busPos);
       if (busPos) {
         const posMachine = await PosMachine.findById(busPos.posMachine).catch(() => null);
-        console.log("PosMachine found:", posMachine);
         if (posMachine) {
           machineId = posMachine.machineId || posMachine.serialNumber ||
                       posMachine._id.toString().slice(-8).toUpperCase();
