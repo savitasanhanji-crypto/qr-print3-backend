@@ -1,32 +1,38 @@
 ﻿const express = require("express");
 const router = express.Router();
 const Ticket = require("../models/Ticket");
+const mongoose = require("mongoose");
 
-// GET /api/tickets/summary?batch_no=121212&date=2026-03-28
+const getModel = (name, schema, collection) => {
+  return mongoose.models[name] || mongoose.model(name, new mongoose.Schema(schema, { collection }));
+};
+
+// GET /api/tickets/summary
 router.get("/summary", async (req, res) => {
   try {
     const { batch_no, date } = req.query;
-
     const queryDate = date ? new Date(date) : new Date();
     const start = new Date(queryDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(queryDate);
     end.setHours(23, 59, 59, 999);
+    const dateStr = queryDate.toISOString().slice(0, 10);
+    const dateParts = dateStr.split("-");
+    const dateIN = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
 
     const query = {
-      dateTime: { $gte: start, $lte: end },
+      $or: [
+        { dateTime: { $gte: start, $lte: end } },
+        { date: { $regex: dateParts[2] + "/" + dateParts[1] } },
+      ],
       ...(batch_no ? { batch_no } : {}),
     };
 
     const tickets = await Ticket.find(query);
+    console.log("Summary found:", tickets.length, "tickets for", dateStr, "batch:", batch_no);
 
-    // Calculate summary
-    let totalTickets = 0;
-    let totalFare = 0;
-    let cashFare = 0;
-    let onlineFare = 0;
-    let totalAdult = 0;
-    let totalChild = 0;
+    let totalTickets = 0, totalFare = 0, cashFare = 0, onlineFare = 0;
+    let totalAdult = 0, totalChild = 0;
     const passCountSummary = {};
 
     tickets.forEach(t => {
@@ -36,11 +42,9 @@ router.get("/summary", async (req, res) => {
         if (t.paymentMode === "Cash") cashFare += t.price || 0;
         if (t.paymentMode === "Online") onlineFare += t.price || 0;
       }
-      totalAdult += t.adultCount || 0;
-      totalChild += t.childCount || 0;
-
-      // Pass counts
-      if (t.passCounts) {
+      totalAdult += Number(t.adultCount) || 0;
+      totalChild += Number(t.childCount) || 0;
+      if (t.passCounts && typeof t.passCounts === "object") {
         Object.entries(t.passCounts).forEach(([pass, count]) => {
           passCountSummary[pass] = (passCountSummary[pass] || 0) + Number(count);
         });
@@ -48,16 +52,10 @@ router.get("/summary", async (req, res) => {
     });
 
     res.status(200).json({
-      success: true,
-      date: queryDate.toISOString().slice(0, 10),
+      success: true, date: dateStr,
       batch_no: batch_no || "All",
-      totalTickets,
-      totalFare,
-      cashFare,
-      onlineFare,
-      totalAdult,
-      totalChild,
-      passCountSummary,
+      totalTickets, totalFare, cashFare, onlineFare,
+      totalAdult, totalChild, passCountSummary,
       totalTransactions: tickets.length,
     });
   } catch (err) {
@@ -70,32 +68,13 @@ router.get("/summary", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { busNumber, batch_no } = req.body;
-    const mongoose = require("mongoose");
 
-    let routeNumber = "";
-    let machineId = "";
-    let resolvedBusNumber = busNumber;
+    const ConductorBus = getModel("conductor_bus_lookup", { conductor_id: String, bus_assigned: String }, "conductor_bus");
+    const BusPos = getModel("buspos_model", { bus: mongoose.Schema.Types.ObjectId, posMachine: mongoose.Schema.Types.ObjectId }, "buspos");
+    const PosMachine = getModel("posmachines_model", { machineId: String, serialNumber: String, name: String }, "posmachines");
+    const Bus = getModel("buses_model", { busNumber: String, name: String }, "buses");
 
-    const ConductorBus = mongoose.models.conductor_bus_lookup ||
-      mongoose.model("conductor_bus_lookup", new mongoose.Schema({
-        conductor_id: String, bus_assigned: String,
-      }, { collection: "conductor_bus" }));
-
-    const BusPos = mongoose.models.buspos ||
-      mongoose.model("buspos", new mongoose.Schema({
-        bus: mongoose.Schema.Types.ObjectId,
-        posMachine: mongoose.Schema.Types.ObjectId,
-      }, { collection: "buspos" }));
-
-    const PosMachine = mongoose.models.posmachines ||
-      mongoose.model("posmachines", new mongoose.Schema({
-        machineId: String, serialNumber: String, name: String,
-      }, { collection: "posmachines" }));
-
-    const Bus = mongoose.models.buses ||
-      mongoose.model("buses", new mongoose.Schema({
-        busNumber: String, name: String,
-      }, { collection: "buses" }));
+    let routeNumber = "", machineId = "", resolvedBusNumber = busNumber;
 
     if (batch_no) {
       const conductorBus = await ConductorBus.findOne({ conductor_id: batch_no }).catch(() => null);
@@ -114,7 +93,6 @@ router.post("/", async (req, res) => {
         }
       }
     }
-
     if (!routeNumber) routeNumber = resolvedBusNumber;
 
     const today = new Date();
