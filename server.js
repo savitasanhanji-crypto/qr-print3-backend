@@ -11,6 +11,7 @@ const conductorRoutes = require("./routes/conductorRoutes");
 const passRoutes = require("./routes/passRoutes");
 const busRoutes = require("./routes/busRoutes");
 const ticketRoute = require("./routes/ticketRoutes");
+const posRoutes = require('./routes/pos'); // ← Add this line
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+app.use('/api/pos', posRoutes); // ← Add this line
 
 // Middleware
 app.use(bodyParser.json());
