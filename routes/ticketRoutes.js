@@ -18,7 +18,6 @@ router.get("/summary", async (req, res) => {
     end.setHours(23, 59, 59, 999);
     const dateStr = queryDate.toISOString().slice(0, 10);
     const dateParts = dateStr.split("-");
-    const dateIN = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
 
     const query = {
       $or: [
@@ -71,45 +70,54 @@ router.post("/", async (req, res) => {
 
     const ConductorBus = getModel("conductor_bus_lookup", { conductor_id: String, bus_assigned: String }, "conductor_bus");
     const BusPos = getModel("buspos_model", { bus: mongoose.Schema.Types.ObjectId, posMachine: mongoose.Schema.Types.ObjectId }, "buspos");
-    const PosMachine = getModel("posmachines_model", { machineId: String, serialNumber: String, name: String }, "posmachines");
+    const PosMachine = getModel("posmachines_model", { deviceId: String, MID: String, machineId: String, serialNumber: String }, "posmachines");
     const Bus = getModel("buses_model", { busNumber: String, name: String }, "buses");
 
-    let routeNumber = "", machineId = "", resolvedBusNumber = busNumber;
+    let routeNumber = "", machineId = "", MID = "", resolvedBusNumber = busNumber;
 
+    // Step 1: Get bus from conductor_bus
     if (batch_no) {
       const conductorBus = await ConductorBus.findOne({ conductor_id: batch_no }).catch(() => null);
       if (conductorBus) resolvedBusNumber = conductorBus.bus_assigned || busNumber;
     }
 
+    // Step 2: Get bus document
     const bus = await Bus.findOne({ busNumber: resolvedBusNumber }).catch(() => null);
     if (bus) {
       routeNumber = bus._id.toString().slice(-6).toUpperCase();
+
+      // Step 3: Get posMachine via buspos
       const busPos = await BusPos.findOne({ bus: bus._id }).catch(() => null);
       if (busPos) {
         const posMachine = await PosMachine.findById(busPos.posMachine).catch(() => null);
         if (posMachine) {
-          machineId = posMachine.machineId || posMachine.serialNumber ||
-                      posMachine._id.toString().slice(-8).toUpperCase();
+          // Use MID field from posmachines collection
+          MID = posMachine.MID || posMachine.machineId || posMachine.serialNumber ||
+                posMachine._id.toString().slice(-4).toUpperCase();
+          machineId = MID;
         }
       }
     }
+
     if (!routeNumber) routeNumber = resolvedBusNumber;
 
+    // Get today's running serial
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayCount = await Ticket.countDocuments({ dateTime: { $gte: today } }).catch(() => 0);
     const serial = String(todayCount + 1).padStart(5, "0");
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const midPart = machineId ? machineId.slice(-4) : "00";
-    const ticketNumber = `SUR-${dateStr}-${midPart}-${serial}`;
 
-    const ticketData = { ...req.body, ticketNumber, routeNumber, machineId, busNumber: resolvedBusNumber };
+    // Ticket number: SUR-YYYYMMDD-MID-XXXXX
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const ticketNumber = `SUR-${dateStr}-${MID || "000"}-${serial}`;
+
+    const ticketData = { ...req.body, ticketNumber, routeNumber, machineId: MID, busNumber: resolvedBusNumber };
     const ticket = new Ticket(ticketData);
     await ticket.save();
 
     res.status(200).json({
       success: true, message: "Ticket saved successfully",
-      ticketNumber, routeNumber, machineId, busNumber: resolvedBusNumber,
+      ticketNumber, routeNumber, machineId: MID, busNumber: resolvedBusNumber,
     });
   } catch (err) {
     console.error(err);
