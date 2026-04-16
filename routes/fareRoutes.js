@@ -32,63 +32,100 @@ router.put("/farechart", async (req, res) => {
   }
 });
 
-// POST calculate fare
-router.post("/calculate-fare", async (req, res) => {
+// GET stops by busNumber - dynamically resolves route
+router.get("/stops-by-bus/:busNumber", async (req, res) => {
   try {
-    const { routeId, from, to } = req.body;
-
-    if (!routeId || !from || !to) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(routeId)) {
-      return res.status(400).json({ message: "Invalid route ID" });
-    }
-
-    // Get route
+    const { busNumber } = req.params;
     const db = mongoose.connection.db;
-    const route = await db.collection("routes").findOne({
-      _id: new mongoose.Types.ObjectId(routeId)
-    });
 
+    // Step 1: Get bus by busNumber
+    const bus = await db.collection("buses").findOne({ busNumber: busNumber });
+    if (!bus) {
+      return res.status(404).json({ success: false, message: "Bus not found" });
+    }
+
+    // Step 2: Get route from busroutes
+    const busRoute = await db.collection("busroutes").findOne({ bus: bus._id });
+    if (!busRoute) {
+      return res.status(404).json({ success: false, message: "No route assigned to this bus" });
+    }
+
+    // Step 3: Get route stops
+    const route = await db.collection("routes").findOne({ _id: busRoute.route });
     if (!route) {
-      return res.status(404).json({ message: "Route not found" });
+      return res.status(404).json({ success: false, message: "Route not found" });
     }
 
     const stops = route.trips?.[0]?.stops || [];
-    if (stops.length === 0) {
-      return res.status(400).json({ message: "No stops found in route" });
+    const sorted = [...stops].sort((a, b) =>
+      (a.sequence || a.stage || 0) - (b.sequence || b.stage || 0)
+    );
+
+    res.json({
+      success: true,
+      busNumber,
+      routeId: route._id.toString(),
+      source: route.source,
+      destination: route.destination,
+      stops: sorted,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+// POST calculate fare by busNumber
+router.post("/calculate-fare", async (req, res) => {
+  try {
+    const { busNumber, from, to } = req.body;
+
+    if (!busNumber || !from || !to) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Find from stop - use sequence as stage
+    const db = mongoose.connection.db;
+
+    // Step 1: Get bus
+    const bus = await db.collection("buses").findOne({ busNumber: busNumber });
+    if (!bus) return res.status(404).json({ message: "Bus not found" });
+
+    // Step 2: Get route
+    const busRoute = await db.collection("busroutes").findOne({ bus: bus._id });
+    if (!busRoute) return res.status(404).json({ message: "No route for this bus" });
+
+    // Step 3: Get stops
+    const route = await db.collection("routes").findOne({ _id: busRoute.route });
+    if (!route) return res.status(404).json({ message: "Route not found" });
+
+    const stops = route.trips?.[0]?.stops || [];
+    if (stops.length === 0) {
+      return res.status(400).json({ message: "No stops found" });
+    }
+
+    // Step 4: Find from stage
     let fromStage = 0;
     if (from !== "SOURCE") {
       const fromStop = stops.find(
         (s) => s.name.toLowerCase() === from.toLowerCase()
       );
-      if (!fromStop) {
-        return res.status(404).json({ message: "From stop not found" });
-      }
+      if (!fromStop) return res.status(404).json({ message: "From stop not found" });
       fromStage = fromStop.stage !== undefined ? fromStop.stage : fromStop.sequence;
     }
 
-    // Find to stop
+    // Step 5: Find to stage
     const toStop = stops.find(
       (s) => s.name.toLowerCase() === to.toLowerCase()
     );
-    if (!toStop) {
-      return res.status(404).json({ message: "To stop not found" });
-    }
+    if (!toStop) return res.status(404).json({ message: "To stop not found" });
     const toStage = toStop.stage !== undefined ? toStop.stage : toStop.sequence;
 
-    // Calculate distance
+    // Step 6: Calculate distance
     const distance = Math.abs(toStage - fromStage);
 
-    // Get fare chart
+    // Step 7: Get fare from chart
     const fareDoc = await db.collection("fareCharts").findOne({ type: "fareChart" });
-    if (!fareDoc) {
-      return res.status(500).json({ message: "Fare chart not found" });
-    }
+    if (!fareDoc) return res.status(500).json({ message: "Fare chart not found" });
 
     const fareChart = fareDoc.fares;
     const fare = fareChart[distance] || fareChart[String(distance)] || 0;
@@ -100,7 +137,7 @@ router.post("/calculate-fare", async (req, res) => {
   }
 });
 
-// POST get stops for a route
+// POST get stops for a route (legacy)
 router.post("/route-stops", async (req, res) => {
   try {
     const { routeId } = req.body;
@@ -111,9 +148,7 @@ router.post("/route-stops", async (req, res) => {
     const route = await db.collection("routes").findOne({
       _id: new mongoose.Types.ObjectId(routeId)
     });
-    if (!route) {
-      return res.status(404).json({ message: "Route not found" });
-    }
+    if (!route) return res.status(404).json({ message: "Route not found" });
     const stops = route.trips?.[0]?.stops || [];
     const sorted = [...stops].sort((a, b) =>
       (a.sequence || 0) - (b.sequence || 0)
