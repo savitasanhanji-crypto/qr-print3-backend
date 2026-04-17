@@ -28,7 +28,6 @@ router.get("/summary", async (req, res) => {
     };
 
     const tickets = await Ticket.find(query);
-    console.log("Summary found:", tickets.length, "tickets for", dateStr, "batch:", batch_no);
 
     let totalTickets = 0, totalFare = 0, cashFare = 0, onlineFare = 0;
     let totalAdult = 0, totalChild = 0;
@@ -67,31 +66,35 @@ router.get("/summary", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const { busNumber, batch_no } = req.body;
-
-    const ConductorBus = getModel("conductor_bus_lookup", { conductor_id: String, bus_assigned: String }, "conductor_bus");
-    const BusPos = getModel("buspos_model", { bus: mongoose.Schema.Types.ObjectId, posMachine: mongoose.Schema.Types.ObjectId }, "buspos");
-    const PosMachine = getModel("posmachines_model", { deviceId: String, MID: String, machineId: String, serialNumber: String }, "posmachines");
-    const Bus = getModel("buses_model", { busNumber: String, name: String }, "buses");
+    const db = mongoose.connection.db;
 
     let routeNumber = "", machineId = "", MID = "", resolvedBusNumber = busNumber;
 
     // Step 1: Get bus from conductor_bus
     if (batch_no) {
-      const conductorBus = await ConductorBus.findOne({ conductor_id: batch_no }).catch(() => null);
+      const conductorBus = await db.collection("conductor_bus").findOne({ conductor_id: batch_no });
       if (conductorBus) resolvedBusNumber = conductorBus.bus_assigned || busNumber;
     }
 
     // Step 2: Get bus document
-    const bus = await Bus.findOne({ busNumber: resolvedBusNumber }).catch(() => null);
+    const bus = await db.collection("buses").findOne({ busNumber: resolvedBusNumber });
     if (bus) {
-      routeNumber = bus._id.toString().slice(-6).toUpperCase();
+      // Step 3: Get route from busroutes then routes collection
+      const busRouteDoc = await db.collection("busroutes").findOne({ bus: bus._id });
+      if (busRouteDoc) {
+        const routeDoc = await db.collection("routes").findOne({ _id: busRouteDoc.route });
+        if (routeDoc) {
+          // Use routeId field from routes collection
+          routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
+          console.log("routeDoc.routeId:", routeDoc.routeId, "routeNumber:", routeNumber);
+        }
+      }
 
-      // Step 3: Get posMachine via buspos
-      const busPos = await BusPos.findOne({ bus: bus._id }).catch(() => null);
+      // Step 4: Get MID from posmachines via buspos
+      const busPos = await db.collection("buspos").findOne({ bus: bus._id });
       if (busPos) {
-        const posMachine = await PosMachine.findById(busPos.posMachine).catch(() => null);
+        const posMachine = await db.collection("posmachines").findOne({ _id: busPos.posMachine });
         if (posMachine) {
-          // Use MID field from posmachines collection
           MID = posMachine.MID || posMachine.machineId || posMachine.serialNumber ||
                 posMachine._id.toString().slice(-4).toUpperCase();
           machineId = MID;
@@ -126,4 +129,3 @@ router.post("/", async (req, res) => {
 });
 
 module.exports = router;
-
