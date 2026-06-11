@@ -41,6 +41,9 @@ mongoose.connect(MONGO_URI)
   console.error("MongoDB connection error:", err.message);
 });
 
+// Health check
+app.get("/", (req, res) => res.json({ status: "ok", message: "SMT Bus API running" }));
+
 // Mount routes
 app.use("/bus", busRoutes);
 app.use("/api/Stop", stopRoutes);
