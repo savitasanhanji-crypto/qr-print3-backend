@@ -147,4 +147,19 @@ router.get("/bus-by-pos/:deviceId", async (req, res) => {
   }
 });
 
+// Temp - Clear all sessions for a conductor (admin use only)
+router.post("/clear-session", async (req, res) => {
+  try {
+    const { batch_no } = req.body;
+    const db = mongoose.connection.db;
+    await db.collection("conductor_sessions").updateMany(
+      { batch_no },
+      { $set: { isActive: false } }
+    );
+    res.json({ success: true, message: "Sessions cleared" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
