@@ -190,4 +190,44 @@ router.post("/calculate-fare", async (req, res) => {
   }
 });
 
+// GET all routes for dropdown
+router.get("/routes", async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const routes = await db.collection("routes").find({}, {
+      projection: { _id: 1, routeId: 1, source: 1, destination: 1 }
+    }).toArray();
+    res.json({ success: true, routes });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+// GET stops by routeId (_id)
+router.get("/stops-by-route/:routeId", async (req, res) => {
+  try {
+    const { routeId } = req.params;
+    const db = mongoose.connection.db;
+    const route = await db.collection("routes").findOne({
+      _id: new mongoose.Types.ObjectId(routeId)
+    });
+    if (!route) return res.status(404).json({ success: false, message: "Route not found" });
+    const stops = route.trips?.[0]?.stops || [];
+    const sorted = [...stops].sort((a, b) =>
+      (a.stage !== undefined ? a.stage : a.sequence || 0) -
+      (b.stage !== undefined ? b.stage : b.sequence || 0)
+    );
+    res.json({
+      success: true,
+      routeId,
+      routeNumber: route.routeId,
+      source: route.source,
+      destination: route.destination,
+      stops: sorted,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
 module.exports = router;
