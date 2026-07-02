@@ -22,14 +22,16 @@ router.post("/login", async (req, res) => {
 
     // Fetch latest bus assigned to conductor
     const db = mongoose.connection.db;
-    const conductorBus = await db.collection("conductor_bus").findOne({ conductor_id: batch_no });
+    // Fetch latest active bus assigned to conductor using batch_no
+    const conductorBus = await db.collection("conductor_bus").findOne(
+      { batch_no: batch_no, isActive: true },
+      { sort: { assignedDate: -1 } } // Get latest assignment
+    );
     let busNumber = null;
     let busId = null;
     if (conductorBus) {
-      busNumber = conductorBus.bus_assigned;
-      // Get bus _id
-      const bus = await db.collection("buses").findOne({ busNumber: busNumber });
-      if (bus) busId = bus._id.toString();
+      busNumber = conductorBus.assignedbusNumber;
+      busId = conductorBus.busId ? conductorBus.busId.toString() : null;
     }
 
     res.status(200).json({
@@ -52,11 +54,14 @@ router.get("/bus/:batch_no", async (req, res) => {
   try {
     const { batch_no } = req.params;
     const db = mongoose.connection.db;
-    const conductorBus = await db.collection("conductor_bus").findOne({ conductor_id: batch_no });
+    const conductorBus = await db.collection("conductor_bus").findOne(
+      { batch_no: batch_no, isActive: true },
+      { sort: { assignedDate: -1 } }
+    );
     if (!conductorBus) {
       return res.status(404).json({ success: false, message: "No bus assigned" });
     }
-    res.status(200).json({ success: true, busNumber: conductorBus.bus_assigned });
+    res.status(200).json({ success: true, busNumber: conductorBus.assignedbusNumber, busId: conductorBus.busId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error", error: err.message });
