@@ -11,21 +11,48 @@ router.post("/login", async (req, res) => {
     if (!batch_no || !password) {
       return res.status(400).json({ success: false, message: "batch_no and password required" });
     }
+
     const conductor = await Conductor.findOne({ batch_no });
     if (!conductor) {
       return res.status(404).json({ success: false, message: "Conductor not found" });
     }
+
     const isMatch = await bcrypt.compare(password, conductor.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: "Incorrect password" });
     }
 
-    // Fetch latest bus assigned to conductor
     const db = mongoose.connection.db;
-    // Fetch latest active bus assigned to conductor using batch_no
+
+    // Check if conductor already has active session
+    const existingSession = await db.collection("conductor_sessions").findOne({
+      batch_no: batch_no,
+      isActive: true,
+    });
+
+    if (existingSession) {
+      return res.status(403).json({
+        success: false,
+        message: "Conductor is already logged in on another device. Please logout first.",
+        alreadyLoggedIn: true,
+      });
+    }
+
+    // Create new session
+    const sessionToken = `${batch_no}_${Date.now()}`;
+    await db.collection("conductor_sessions").insertOne({
+      batch_no: batch_no,
+      conductorId: conductor._id.toString(),
+      sessionToken,
+      isActive: true,
+      loginTime: new Date(),
+      deviceId: req.body.deviceId || "unknown",
+    });
+
+    // Fetch bus assigned to conductor
     const conductorBus = await db.collection("conductor_bus").findOne(
       { batch_no: batch_no, isActive: true },
-      { sort: { assignedDate: -1 } } // Get latest assignment
+      { sort: { assignedDate: -1 } }
     );
     let busNumber = null;
     let busId = null;
@@ -42,7 +69,27 @@ router.post("/login", async (req, res) => {
       batch_no: conductor.batch_no,
       busNumber: busNumber || null,
       busId: busId || null,
+      sessionToken,
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+// Conductor logout
+router.post("/logout", async (req, res) => {
+  try {
+    const { batch_no, sessionToken } = req.body;
+    if (!batch_no) {
+      return res.status(400).json({ success: false, message: "batch_no required" });
+    }
+    const db = mongoose.connection.db;
+    await db.collection("conductor_sessions").updateOne(
+      { batch_no, sessionToken, isActive: true },
+      { $set: { isActive: false, logoutTime: new Date() } }
+    );
+    res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error", error: err.message });
