@@ -24,6 +24,13 @@ router.post("/login", async (req, res) => {
 
     const db = mongoose.connection.db;
 
+    // Auto-expire sessions older than 12 hours
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    await db.collection("conductor_sessions").updateMany(
+      { batch_no, isActive: true, loginTime: { $lt: twelveHoursAgo } },
+      { $set: { isActive: false, logoutTime: new Date() } }
+    );
+
     // Check if conductor already has active session
     const existingSession = await db.collection("conductor_sessions").findOne({
       batch_no: batch_no,
