@@ -131,24 +131,30 @@ router.get("/stops-by-bus/:busNumber", async (req, res) => {
 // POST calculate fare by busNumber
 router.post("/calculate-fare", async (req, res) => {
   try {
-    const { busNumber, from, to } = req.body;
+    const { busNumber, routeId, from, to } = req.body;
 
-    if (!busNumber || !from || !to) {
+    if ((!busNumber && !routeId) || !from || !to) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const db = mongoose.connection.db;
 
-    // Step 1: Get bus
-    const bus = await db.collection("buses").findOne({ busNumber: busNumber });
-    if (!bus) return res.status(404).json({ message: "Bus not found" });
+    let route = null;
 
-    // Step 2: Get route
-    const busRoute = await db.collection("busroutes").findOne({ bus: bus._id });
-    if (!busRoute) return res.status(404).json({ message: "No route for this bus" });
+    // Use routeId directly if provided
+    if (routeId && mongoose.Types.ObjectId.isValid(routeId)) {
+      route = await db.collection("routes").findOne({ _id: new mongoose.Types.ObjectId(routeId) });
+    }
 
-    // Step 3: Get stops
-    const route = await db.collection("routes").findOne({ _id: busRoute.route });
+    // Fallback to busNumber lookup
+    if (!route && busNumber) {
+      const bus = await db.collection("buses").findOne({ busNumber: busNumber });
+      if (bus) {
+        const busRoute = await db.collection("busroutes").findOne({ bus: bus._id });
+        if (busRoute) route = await db.collection("routes").findOne({ _id: busRoute.route });
+      }
+    }
+
     if (!route) return res.status(404).json({ message: "Route not found" });
 
     const stops = route.trips?.[0]?.stops || [];
