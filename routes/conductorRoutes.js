@@ -31,11 +31,19 @@ router.post("/login", async (req, res) => {
     });
 
     if (existingSession) {
-      return res.status(403).json({
-        success: false,
-        message: "Conductor is already logged in on another device. Please logout first.",
-        alreadyLoggedIn: true,
-      });
+      const { forceLogin } = req.body;
+      if (!forceLogin) {
+        return res.status(403).json({
+          success: false,
+          message: "Conductor is already logged in on another device. Do you want to force login?",
+          alreadyLoggedIn: true,
+        });
+      }
+      // Force login - clear existing session
+      await db.collection("conductor_sessions").updateMany(
+        { batch_no, isActive: true },
+        { $set: { isActive: false, logoutTime: new Date() } }
+      );
     }
 
     // Create new session
