@@ -3,7 +3,8 @@ const conductorSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     batch_no: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+    password: { type: String, required: true },
+    Contact: { type: String, default: "" }
   },
   { collection: "conductors" }
 );
