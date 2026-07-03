@@ -24,34 +24,11 @@ router.post("/login", async (req, res) => {
 
     const db = mongoose.connection.db;
 
-    // Auto-expire sessions older than 12 hours
-    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    // Clear any existing sessions before creating new one
     await db.collection("conductor_sessions").updateMany(
-      { batch_no, isActive: true, loginTime: { $lt: twelveHoursAgo } },
+      { batch_no, isActive: true },
       { $set: { isActive: false, logoutTime: new Date() } }
     );
-
-    // Check if conductor already has active session
-    const existingSession = await db.collection("conductor_sessions").findOne({
-      batch_no: batch_no,
-      isActive: true,
-    });
-
-    if (existingSession) {
-      const { forceLogin } = req.body;
-      if (!forceLogin) {
-        return res.status(403).json({
-          success: false,
-          message: "Conductor is already logged in on another device. Do you want to force login?",
-          alreadyLoggedIn: true,
-        });
-      }
-      // Force login - clear existing session
-      await db.collection("conductor_sessions").updateMany(
-        { batch_no, isActive: true },
-        { $set: { isActive: false, logoutTime: new Date() } }
-      );
-    }
 
     // Create new session
     const sessionToken = `${batch_no}_${Date.now()}`;
