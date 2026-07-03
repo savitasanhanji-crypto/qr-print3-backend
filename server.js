@@ -13,6 +13,7 @@ const busRoutes = require("./routes/busRoutes");
 const ticketRoute = require("./routes/ticketRoutes");
 const posRoutes = require("./routes/pos");
 const fareRoutes = require("./routes/fareRoutes");
+const otpRoutes = require("./routes/otpRoutes");
 
 
 const app = express();
@@ -54,3 +55,4 @@ app.use("/conductor", conductorRoutes);
 app.use("/api/passes", passRoutes);
 app.use("/api/pos", posRoutes);
 app.use("/api", fareRoutes);
+app.use("/conductor", otpRoutes);
