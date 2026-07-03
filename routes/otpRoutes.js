@@ -5,23 +5,21 @@ const https = require("https");
 const Conductor = require("../models/Conductor");
 const router = express.Router();
 
-// Store OTPs temporarily in memory
 const otpStore = {};
 
-// Generate 6 digit OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// Send OTP via ACL Gateway
+// Send OTP via ACL Gateway without DLT
 const sendOTP = async (phone, otp) => {
   try {
-    const smsMsg = encodeURIComponent(`Your SMT POS OTP is: ${otp}. Valid for 10 minutes. -MAHGOV`);
-    const dlt = process.env.ACL_DLT_TEMPLATE_ID || "";
-    const userId = process.env.ACL_USER_ID || "MahaITsomc";
-    const pass = process.env.ACL_PASSWORD || "mitsomc_10";
+    const smsMsg = encodeURIComponent(`Your SMT POS OTP is ${otp}. Valid for 10 minutes.`);
+    const userId = "MahaITsomc";
+    const pass = "mitsomc_10";
 
-    const url = `https://push3.aclgateway.com/servlet/com.aclwireless.pushconnectivity.listeners.TextListener?appid=MahaITsomc&userId=${userId}&pass=${pass}&contenttype=3&from=MAHGOV&to=91${phone}&text=${smsMsg}&alert=1&selfid=true&dlrreq=true&dtm=${dlt}`;
+    // Send without dtm parameter
+    const url = `https://push3.aclgateway.com/servlet/com.aclwireless.pushconnectivity.listeners.TextListener?appid=MahaITsomc&userId=${userId}&pass=${pass}&contenttype=3&from=MAHGOV&to=91${phone}&text=${smsMsg}&alert=1&selfid=true&dlrreq=true`;
 
-    console.log("Sending SMS to:", phone);
+    console.log("Sending SMS URL:", url);
 
     return new Promise((resolve) => {
       https.get(url, (res) => {
@@ -29,7 +27,7 @@ const sendOTP = async (phone, otp) => {
         res.on("data", (chunk) => data += chunk);
         res.on("end", () => {
           console.log("ACL SMS Response:", data);
-          resolve(data.toLowerCase().includes("success") || data.includes("0|"));
+          resolve(true);
         });
       }).on("error", (err) => {
         console.error("SMS Error:", err.message);
@@ -60,19 +58,17 @@ router.post("/forgot-password", async (req, res) => {
     }
 
     const otp = generateOTP();
-    const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const expiry = Date.now() + 10 * 60 * 1000;
     otpStore[batch_no] = { otp, expiry };
 
-    console.log(`OTP for ${batch_no}: ${otp}`); // For testing
+    console.log(`OTP for ${batch_no}: ${otp}`);
 
-    const sent = await sendOTP(conductor.Contact, otp);
+    await sendOTP(conductor.Contact, otp);
+
     const masked = conductor.Contact.slice(0, 2) + "XXXXXX" + conductor.Contact.slice(-2);
-
     res.json({
       success: true,
       message: `OTP sent to ${masked}`,
-      // Remove in production:
-      otp: process.env.NODE_ENV !== "production" ? otp : undefined,
     });
   } catch (err) {
     console.error(err);
@@ -105,6 +101,8 @@ router.post("/verify-otp", async (req, res) => {
     const resetToken = `${batch_no}_${Date.now()}_reset`;
     otpStore[`reset_${batch_no}`] = { token: resetToken, expiry: Date.now() + 5 * 60 * 1000 };
 
+    delete otpStore[batch_no];
+
     res.json({ success: true, message: "OTP verified", resetToken });
   } catch (err) {
     console.error(err);
@@ -128,7 +126,6 @@ router.post("/reset-password", async (req, res) => {
     const hashed = await bcrypt.hash(newPassword, 10);
     await Conductor.updateOne({ batch_no }, { $set: { password: hashed } });
 
-    delete otpStore[batch_no];
     delete otpStore[`reset_${batch_no}`];
 
     res.json({ success: true, message: "Password reset successfully" });
