@@ -11,6 +11,7 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 const sendOTP = async (phone, otp) => {
   try {
     const apiKey = process.env.FAST2SMS_API_KEY;
+    console.log("API Key available:", apiKey ? "YES (length: " + apiKey.length + ")" : "NO - NOT SET");
     const message = `Your SMT POS password reset OTP is ${otp}. Valid for 10 minutes.`;
     const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${YKzRFaHE906gie5DfcwABtjdVCWQMvxknr3XZpsyUb82oJuqO7104YGdJLmPW9w36haiQo7sqfFRCOvH}&route=q&message=${encodeURIComponent(message)}&language=english&flash=0&numbers=${phone}`;
 
