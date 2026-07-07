@@ -2,7 +2,6 @@
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const axios = require("axios");
-const Conductor = require("../models/Conductor");
 const router = express.Router();
 
 const otpStore = {};
@@ -40,7 +39,8 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { batch_no } = req.body;
     if (!batch_no) return res.status(400).json({ success: false, message: "Batch number required" });
-    const conductor = await Conductor.findOne({ batch_no });
+    const db = mongoose.connection.db;
+    const conductor = await db.collection("Conductor").findOne({ batch_no: batch_no });
     if (!conductor) return res.status(404).json({ success: false, message: "Conductor not found" });
     if (!conductor.Contact) return res.status(400).json({ success: false, message: "No contact number registered" });
 
@@ -92,7 +92,8 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid or expired reset token" });
     }
     const hashed = await bcrypt.hash(newPassword, 10);
-    await Conductor.updateOne({ batch_no }, { $set: { password: hashed } });
+    const db = mongoose.connection.db;
+    await db.collection("Conductor").updateOne({ batch_no }, { $set: { password: hashed } });
     delete otpStore[`reset_${batch_no}`];
     res.json({ success: true, message: "Password reset successfully" });
   } catch (err) {
