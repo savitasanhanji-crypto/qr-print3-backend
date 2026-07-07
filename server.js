@@ -57,11 +57,4 @@ app.use("/api/pos", posRoutes);
 app.use("/api", fareRoutes);
 app.use("/conductor", otpRoutes);
 
-// Temp - check env vars
-app.get("/check-env", (req, res) => {
-  res.json({
-    fast2sms_key_set: !!process.env.FAST2SMS_API_KEY,
-    fast2sms_key_length: process.env.FAST2SMS_API_KEY ? process.env.FAST2SMS_API_KEY.length : 0,
-    fast2sms_key_preview: process.env.FAST2SMS_API_KEY ? process.env.FAST2SMS_API_KEY.substring(0, 5) + "..." : "NOT SET",
-  });
-});
+
