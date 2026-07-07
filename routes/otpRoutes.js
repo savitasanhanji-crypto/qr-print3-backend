@@ -39,17 +39,25 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { batch_no } = req.body;
     if (!batch_no) return res.status(400).json({ success: false, message: "Batch number required" });
+
     const db = mongoose.connection.db;
     const conductor = await db.collection("Conductor").findOne({ batch_no: batch_no });
+    console.log("Conductor:", JSON.stringify(conductor));
+
     if (!conductor) return res.status(404).json({ success: false, message: "Conductor not found" });
-    if (!conductor.Contact) return res.status(400).json({ success: false, message: "No contact number registered" });
+
+    // Check all possible phone field names
+    const contactNumber = conductor.phone_no || conductor.Contact || conductor.contact || conductor.phone || conductor.mobile;
+    console.log("Contact number:", contactNumber);
+
+    if (!contactNumber) return res.status(400).json({ success: false, message: "No contact number registered. Please contact admin." });
 
     const otp = generateOTP();
     otpStore[batch_no] = { otp, expiry: Date.now() + 10 * 60 * 1000 };
     console.log(`OTP for ${batch_no}: ${otp}`);
 
-    const sent = await sendOTP(conductor.Contact, otp);
-    const masked = conductor.Contact.slice(0, 2) + "XXXXXX" + conductor.Contact.slice(-2);
+    const sent = await sendOTP(contactNumber, otp);
+    const masked = contactNumber.slice(0, 2) + "XXXXXX" + contactNumber.slice(-2);
     res.json({
       success: true,
       message: sent ? `OTP sent to ${masked}` : `OTP generated (SMS failed)`,
