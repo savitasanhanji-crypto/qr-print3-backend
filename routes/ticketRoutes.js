@@ -132,8 +132,10 @@ router.post("/", async (req, res) => {
       if (busPos) {
         const posMachine = await db.collection("posmachines").findOne({ _id: busPos.posMachine });
         if (posMachine) {
-          MID = posMachine.MID || posMachine.machineId || posMachine.serialNumber ||
-                posMachine._id.toString().slice(-4).toUpperCase();
+          const serial4 = posMachine.serialNumber
+                ? posMachine.serialNumber.toString().slice(-4).toUpperCase()
+                : posMachine._id.toString().slice(-4).toUpperCase();
+          MID = serial4;
           machineId = MID;
         }
       }
