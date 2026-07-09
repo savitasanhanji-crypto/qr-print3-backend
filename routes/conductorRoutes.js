@@ -58,33 +58,46 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    // Step 7: Get bus details
-    const busNumber = conductorBus.assignedbusNumber;
-    const busId = conductorBus.busId;
+    // Step 7: Get ALL current and future assignments for conductor
+    const allAssignments = await db.collection("conductor_bus").find({
+      batch_no: batch_no,
+      assignedDate: { $gte: today },
+    }).sort({ assignedDate: 1 }).toArray();
 
-    if (!busId) {
-      return res.status(404).json({ success: false, message: "Bus ID not found in assignment. Please contact admin." });
+    if (allAssignments.length === 0) {
+      allAssignments.push(conductorBus);
     }
 
-    // Step 8: Get latest route assigned to bus from busroutes
-    const busRoute = await db.collection("busroutes").findOne(
-      { bus: new mongoose.Types.ObjectId(busId.toString()) },
-      { sort: { _id: -1 } }
-    );
+    // Step 8: Get all routes for all assigned buses
+    let assignedRoutes = [];
+    const seenRoutes = new Set();
 
-    let assignedRoute = null;
-    if (busRoute) {
-      const route = await db.collection("routes").findOne({ _id: busRoute.route });
-      if (route) {
-        assignedRoute = {
-          _id: route._id.toString(),
-          routeId: route.routeId,
-          source: route.source,
-          destination: route.destination,
-          label: `Route ${route.routeId}: ${route.source} → ${route.destination}`,
-        };
+    for (const assignment of allAssignments) {
+      const busId = assignment.busId;
+      if (!busId) continue;
+
+      const busRoutes = await db.collection("busroutes").find({
+        bus: new mongoose.Types.ObjectId(busId.toString())
+      }).sort({ _id: -1 }).toArray();
+
+      for (const busRoute of busRoutes) {
+        const route = await db.collection("routes").findOne({ _id: busRoute.route });
+        if (route && !seenRoutes.has(route._id.toString())) {
+          seenRoutes.add(route._id.toString());
+          assignedRoutes.push({
+            _id: route._id.toString(),
+            routeId: route.routeId,
+            source: route.source,
+            destination: route.destination,
+            busNumber: assignment.assignedbusNumber,
+            busId: busId.toString(),
+            label: `Route ${route.routeId}: ${route.source} → ${route.destination}`,
+          });
+        }
       }
     }
+
+    const assignedRoute = assignedRoutes.length > 0 ? assignedRoutes[0] : null;
 
     // Step 9: Create session
     const sessionToken = `${batch_no}_${Date.now()}`;
