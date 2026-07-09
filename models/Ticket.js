@@ -16,6 +16,8 @@ const ticketSchema = new mongoose.Schema({
   childCount: { type: Number, default: 0 },
   basePrice: { type: Number, default: 0 },
   passCounts: { type: Object, default: {} },
+  luggageCount: { type: Number, default: 0 },
+  luggageAmount: { type: Number, default: 0 },
   dateTime: { type: Date, default: Date.now },
   date: { type: String },
   time: { type: String },

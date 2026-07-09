@@ -31,7 +31,10 @@ router.get("/summary", async (req, res) => {
 
     let totalTickets = 0, totalFare = 0, cashFare = 0, onlineFare = 0;
     let totalAdult = 0, totalChild = 0;
+    let totalLuggageCount = 0, totalLuggageFare = 0;
+    let totalBoarded = 0, totalAlighted = 0;
     const passCountSummary = {};
+    const stopSummary = {};
 
     tickets.forEach(t => {
       if (t.paymentMode !== "Pass") {
@@ -40,12 +43,43 @@ router.get("/summary", async (req, res) => {
         if (t.paymentMode === "Cash") cashFare += t.price || 0;
         if (t.paymentMode === "Online") onlineFare += t.price || 0;
       }
-      totalAdult += Number(t.adultCount) || 0;
-      totalChild += Number(t.childCount) || 0;
+
+      // Passenger counts
+      const adultC = Number(t.adultCount) || 0;
+      const childC = Number(t.childCount) || 0;
+      totalAdult += adultC;
+      totalChild += childC;
+
+      // Pass holders
       if (t.passCounts && typeof t.passCounts === "object") {
         Object.entries(t.passCounts).forEach(([pass, count]) => {
           passCountSummary[pass] = (passCountSummary[pass] || 0) + Number(count);
         });
+      }
+
+      // Luggage
+      if (t.luggageCount && t.luggageAmount) {
+        totalLuggageCount += Number(t.luggageCount) || 0;
+        totalLuggageFare += (Number(t.luggageCount) || 0) * (Number(t.luggageAmount) || 0);
+      }
+
+      // Passengers boarded (all passengers on this ticket)
+      const passHolderCount = t.passCounts ?
+        Object.values(t.passCounts).reduce((a, b) => a + Number(b), 0) : 0;
+      const boardedOnTicket = adultC + childC + passHolderCount;
+      totalBoarded += boardedOnTicket;
+
+      // Track boarding stops
+      if (t.boardingStop) {
+        if (!stopSummary[t.boardingStop]) stopSummary[t.boardingStop] = { boarded: 0, alighted: 0 };
+        stopSummary[t.boardingStop].boarded += boardedOnTicket;
+      }
+
+      // Track alighting stops
+      if (t.destinationStop) {
+        if (!stopSummary[t.destinationStop]) stopSummary[t.destinationStop] = { boarded: 0, alighted: 0 };
+        stopSummary[t.destinationStop].alighted += boardedOnTicket;
+        totalAlighted += boardedOnTicket;
       }
     });
 
@@ -54,6 +88,9 @@ router.get("/summary", async (req, res) => {
       batch_no: batch_no || "All",
       totalTickets, totalFare, cashFare, onlineFare,
       totalAdult, totalChild, passCountSummary,
+      totalLuggageCount, totalLuggageFare,
+      totalBoarded, totalAlighted,
+      stopSummary,
       totalTransactions: tickets.length,
     });
   } catch (err) {
