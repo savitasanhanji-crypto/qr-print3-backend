@@ -76,7 +76,10 @@ router.get("/stops-by-conductor/:batch_no", async (req, res) => {
       routeId: route._id.toString(),
       source: route.source,
       destination: route.destination,
-      stops: sorted,
+      stops: sorted.map(s => ({
+        ...s,
+        nameMarathi: s.nameMarathi || s.name,
+      })),
     });
   } catch (err) {
     console.error(err);
@@ -120,7 +123,10 @@ router.get("/stops-by-bus/:busNumber", async (req, res) => {
       routeId: route._id.toString(),
       source: route.source,
       destination: route.destination,
-      stops: sorted,
+      stops: sorted.map(s => ({
+        ...s,
+        nameMarathi: s.nameMarathi || s.name,
+      })),
     });
   } catch (err) {
     console.error(err);
