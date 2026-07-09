@@ -46,6 +46,17 @@ mongoose.connect(MONGO_URI)
 // Health check
 app.get("/", (req, res) => res.json({ status: "ok", message: "SMT Bus API running" }));
 
+// Temp - check posmachines
+app.get("/check-pos", async (req, res) => {
+  try {
+    const db = require("mongoose").connection.db;
+    const pos = await db.collection("posmachines").find({}).toArray();
+    res.json({ success: true, pos });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Mount routes
 app.use("/bus", busRoutes);
 app.use("/api/Stop", stopRoutes);
