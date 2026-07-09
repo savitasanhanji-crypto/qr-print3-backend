@@ -103,9 +103,10 @@ router.post("/login", async (req, res) => {
       conductorId: conductor._id,
       conductorName: conductor.name,
       batch_no: conductor.batch_no,
-      busNumber: busNumber || null,
-      busId: busId ? busId.toString() : null,
+      busNumber: conductorBus.assignedbusNumber || null,
+      busId: conductorBus.busId ? conductorBus.busId.toString() : null,
       assignedRoute,
+      assignedRoutes,
       sessionToken,
     });
   } catch (err) {
