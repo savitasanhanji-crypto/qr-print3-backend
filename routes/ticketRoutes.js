@@ -163,6 +163,7 @@ router.post("/", async (req, res) => {
             routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
           }
           console.log("Final routeNumber:", routeNumber);
+        }
       }
 
       // Step 4: Get MID from posmachines using deviceId
