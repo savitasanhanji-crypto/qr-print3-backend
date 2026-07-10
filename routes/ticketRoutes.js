@@ -156,7 +156,7 @@ router.post("/", async (req, res) => {
           // Use routeId from app if provided, else from bus lookup
           const appRouteId = req.body.routeId || "";
           if (appRouteId) {
-            const appRoute = await db.collection("routes").findOne({ _id: new mongoose.Types.ObjectId(appRouteId.toString()) });
+            const appRoute = await db.collection("routes").findOne({ $or: [{ _id: new mongoose.Types.ObjectId(appRouteId.toString()) }, { routeId: appRouteId }] });
             console.log("appRoute found:", appRoute ? appRoute.routeId : "NOT FOUND");
             routeNumber = appRoute ? (appRoute.routeId || appRoute._id.toString()) : (routeDoc.routeId || "");
             routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
