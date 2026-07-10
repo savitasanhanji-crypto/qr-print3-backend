@@ -153,9 +153,15 @@ router.post("/", async (req, res) => {
       if (busRouteDoc) {
         const routeDoc = await db.collection("routes").findOne({ _id: busRouteDoc.route });
         if (routeDoc) {
-          // Use routeId field from routes collection
-          routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
-          console.log("routeDoc.routeId:", routeDoc.routeId, "routeNumber:", routeNumber);
+          // Use routeId from app if provided, else from bus lookup
+          const appRouteId = req.body.routeId || "";
+          if (appRouteId) {
+            const appRoute = await db.collection("routes").findOne({ _id: new mongoose.Types.ObjectId(appRouteId) });
+            routeNumber = appRoute?.routeId || routeDoc.routeId || "";
+          } else {
+            routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
+          }
+          console.log("routeNumber:", routeNumber, "appRouteId:", appRouteId);
         }
       }
 

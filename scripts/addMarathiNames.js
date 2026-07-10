@@ -6,6 +6,7 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
   const db = mongoose.connection.db;
 
   const stopTranslations = {
+    // Route 77 stops
     "Railway Station": "रेल्वे स्थानक",
     "Railway Station ": "रेल्वे स्थानक",
     "Shivaji chowk": "शिवाजी चौक",
@@ -42,6 +43,27 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
     "Nil": "निळ",
     "Nil ": "निळ",
     "Nanhegoan": "नानहेगाव",
+    // Route 83B stops
+    "Khadaki Dhotri": "खडकी धोत्री",
+    // Route Rajendra Chowk - Wadgaon stops
+    "Rajendra Chowk": "राजेंद्र चौक",
+    "Kanna Chowk": "कन्ना चौक",
+    "Kontam Chowk": "कोंताम चौक",
+    "Balives": "बालीवेस",
+    "Shivaji Chowk": "शिवाजी चौक",
+    "Juna Puna Naka": "जुना पुणे नाका",
+    "Bale Corner": "बाळे कॉर्नर",
+    "Ambika Nagar": "अंबिका नगर",
+    "Mardi Fata": "मार्डी फाटा",
+    "Bhogaon": "भोगाव",
+    "Ganapati": "गणपती",
+    "Banegaon": "बानेगाव",
+    "Lodhi Wasti": "लोधी वस्ती",
+    "Mardi": "मार्डी",
+    "Kashid Mala": "काशीद माळ",
+    "Narotewadi": "नारोटेवाडी",
+    "Odha": "ओढा",
+    "Wadgaon": "वाडगाव",
   };
 
   const routes = await db.collection("routes").find({}).toArray();
@@ -69,6 +91,29 @@ mongoose.connect(process.env.MONGO_URI).then(async () => {
       );
       updatedCount++;
       console.log(`Updated route: ${route.source} -> ${route.destination}`);
+    }
+  }
+
+  // Also update stops array directly (for routes without trips)
+  const allRoutes = await db.collection("routes").find({}).toArray();
+  for (const route of allRoutes) {
+    if (!route.stops || route.stops.length === 0) continue;
+    let modified = false;
+    const updatedStops = route.stops.map(stop => {
+      const marathi = stopTranslations[stop.name] || stopTranslations[stop.name?.trim()];
+      if (marathi && !stop.nameMarathi) {
+        modified = true;
+        return { ...stop, nameMarathi: marathi };
+      }
+      return stop;
+    });
+    if (modified) {
+      await db.collection("routes").updateOne(
+        { _id: route._id },
+        { $set: { stops: updatedStops } }
+      );
+      updatedCount++;
+      console.log(`Updated route stops: ${route.source} -> ${route.destination}`);
     }
   }
 
