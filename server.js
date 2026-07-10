@@ -46,6 +46,19 @@ mongoose.connect(MONGO_URI)
 // Health check
 app.get("/", (req, res) => res.json({ status: "ok", message: "SMT Bus API running" }));
 
+app.post("/update-pos-device", async (req, res) => {
+  try {
+    const db = require("mongoose").connection.db;
+    const result = await db.collection("posmachines").updateOne(
+      { serialNumber: "9222136432" },
+      { $set: { deviceId: "454d68d198898836" } }
+    );
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Temp - check posmachines
 app.get("/check-pos", async (req, res) => {
   try {
