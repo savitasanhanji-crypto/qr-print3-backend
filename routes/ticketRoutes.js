@@ -35,8 +35,24 @@ router.get("/summary", async (req, res) => {
     let totalBoarded = 0, totalAlighted = 0;
     const passCountSummary = {};
     const stopSummary = {};
+    const routeSummary = {};
 
     tickets.forEach(t => {
+      // Group by route
+      const routeKey = t.routeNumber || t.busNumber || "Unknown";
+      if (!routeSummary[routeKey]) {
+        routeSummary[routeKey] = {
+          routeNumber: routeKey,
+          busNumber: t.busNumber || "",
+          totalTickets: 0, totalFare: 0,
+          cashFare: 0, onlineFare: 0,
+          totalAdult: 0, totalChild: 0,
+          totalBoarded: 0, totalAlighted: 0,
+          totalLuggageCount: 0, totalLuggageFare: 0,
+          passCountSummary: {},
+        };
+      }
+      const rs = routeSummary[routeKey];
       if (t.paymentMode !== "Pass") {
         totalTickets++;
         totalFare += t.price || 0;
@@ -49,11 +65,22 @@ router.get("/summary", async (req, res) => {
       const childC = Number(t.childCount) || 0;
       totalAdult += adultC;
       totalChild += childC;
+      rs.totalAdult += adultC;
+      rs.totalChild += childC;
+
+      // Tickets and fare
+      if (t.paymentMode !== "Pass") {
+        rs.totalTickets++;
+        rs.totalFare += t.price || 0;
+        if (t.paymentMode === "Cash") rs.cashFare += t.price || 0;
+        if (t.paymentMode === "Online") rs.onlineFare += t.price || 0;
+      }
 
       // Pass holders
       if (t.passCounts && typeof t.passCounts === "object") {
         Object.entries(t.passCounts).forEach(([pass, count]) => {
           passCountSummary[pass] = (passCountSummary[pass] || 0) + Number(count);
+          rs.passCountSummary[pass] = (rs.passCountSummary[pass] || 0) + Number(count);
         });
       }
 
@@ -61,13 +88,16 @@ router.get("/summary", async (req, res) => {
       if (t.luggageCount && t.luggageAmount) {
         totalLuggageCount += Number(t.luggageCount) || 0;
         totalLuggageFare += (Number(t.luggageCount) || 0) * (Number(t.luggageAmount) || 0);
+        rs.totalLuggageCount += Number(t.luggageCount) || 0;
+        rs.totalLuggageFare += (Number(t.luggageCount) || 0) * (Number(t.luggageAmount) || 0);
       }
 
-      // Passengers boarded (all passengers on this ticket)
+      // Passengers boarded
       const passHolderCount = t.passCounts ?
         Object.values(t.passCounts).reduce((a, b) => a + Number(b), 0) : 0;
       const boardedOnTicket = adultC + childC + passHolderCount;
       totalBoarded += boardedOnTicket;
+      rs.totalBoarded += boardedOnTicket;
 
       // Track boarding stops
       if (t.boardingStop) {
@@ -80,6 +110,7 @@ router.get("/summary", async (req, res) => {
         if (!stopSummary[t.destinationStop]) stopSummary[t.destinationStop] = { boarded: 0, alighted: 0 };
         stopSummary[t.destinationStop].alighted += boardedOnTicket;
         totalAlighted += boardedOnTicket;
+        rs.totalAlighted += boardedOnTicket;
       }
     });
 
@@ -91,6 +122,7 @@ router.get("/summary", async (req, res) => {
       totalLuggageCount, totalLuggageFare,
       totalBoarded, totalAlighted,
       stopSummary,
+      routeSummary: Object.values(routeSummary),
       totalTransactions: tickets.length,
     });
   } catch (err) {
