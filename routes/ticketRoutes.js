@@ -153,16 +153,16 @@ router.post("/", async (req, res) => {
       if (busRouteDoc) {
         const routeDoc = await db.collection("routes").findOne({ _id: busRouteDoc.route });
         if (routeDoc) {
-          // Use routeId from app if provided, else from bus lookup
+          // Use routeNumber directly from app request
+          const appRouteNumber = req.body.routeNumber || "";
           const appRouteId = req.body.routeId || "";
-          if (appRouteId) {
-            const appRoute = await db.collection("routes").findOne({ $or: [{ _id: new mongoose.Types.ObjectId(appRouteId.toString()) }, { routeId: appRouteId }] });
-            console.log("appRoute found:", appRoute ? appRoute.routeId : "NOT FOUND");
-            routeNumber = appRoute ? (appRoute.routeId || appRoute._id.toString()) : (routeDoc.routeId || "");
+          if (appRouteNumber) {
+            routeNumber = appRouteNumber;
+            console.log("Using routeNumber from app:", routeNumber);
+          } else {
             routeNumber = routeDoc.routeId || routeDoc._id.toString().slice(-6).toUpperCase();
           }
-          console.log("routeNumber:", routeNumber, "appRouteId:", appRouteId);
-        }
+          console.log("Final routeNumber:", routeNumber);
       }
 
       // Step 4: Get MID from posmachines using deviceId
