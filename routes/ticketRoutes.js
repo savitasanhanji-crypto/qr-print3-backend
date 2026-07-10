@@ -127,17 +127,19 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Step 4: Get MID from posmachines via buspos
-      const busPos = await db.collection("buspos").findOne({ bus: bus._id });
-      if (busPos) {
-        const posMachine = await db.collection("posmachines").findOne({ _id: busPos.posMachine });
-        if (posMachine) {
-          const serial4 = posMachine.serialNumber
-                ? posMachine.serialNumber.toString().slice(-4).toUpperCase()
-                : posMachine._id.toString().slice(-4).toUpperCase();
-          MID = serial4;
-          machineId = MID;
+      // Step 4: Get MID from posmachines using deviceId
+      const deviceId = req.body.deviceId || "";
+      console.log("Looking up deviceId:", deviceId);
+      if (deviceId) {
+        const posMachine = await db.collection("posmachines").findOne({ deviceId: deviceId });
+        console.log("POS Machine:", JSON.stringify(posMachine));
+        if (posMachine && posMachine.serialNumber) {
+          MID = posMachine.serialNumber.toString().slice(-4).toUpperCase();
+        } else if (posMachine) {
+          MID = posMachine._id.toString().slice(-4).toUpperCase();
         }
+        machineId = MID;
+        console.log("MID set to:", MID);
       }
     }
 
