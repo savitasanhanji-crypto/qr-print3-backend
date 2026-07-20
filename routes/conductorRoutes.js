@@ -59,6 +59,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Step 7: Get ALL current and future assignments for conductor
+    const todayStr = today.toISOString().slice(0, 10);
     let shiftOptions = [];
     const allAssignments = await db.collection("conductor_bus").find({
       batch_no: batch_no,
