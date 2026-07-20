@@ -62,7 +62,7 @@ router.post("/login", async (req, res) => {
     let shiftOptions = [];
     const allAssignments = await db.collection("conductor_bus").find({
       batch_no: batch_no,
-      assignedDate: { $gte: today },
+      assignedDate: { $gte: todayStr },
     }).sort({ assignedDate: 1 }).toArray();
 
     if (allAssignments.length === 0) {
