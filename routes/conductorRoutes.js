@@ -59,6 +59,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Step 7: Get ALL current and future assignments for conductor
+    let shiftOptions = [];
     const allAssignments = await db.collection("conductor_bus").find({
       batch_no: batch_no,
       assignedDate: { $gte: today },
@@ -98,6 +99,47 @@ router.post("/login", async (req, res) => {
     }
 
     const assignedRoute = assignedRoutes.length > 0 ? assignedRoutes[0] : null;
+
+    // Build shiftOptions grouped by shift
+    const shiftMap = {};
+    for (const assignment of allAssignments) {
+      const shift = assignment.shift || "General";
+      const busId = assignment.busId;
+      const shiftKey = `${shift}_${busId}`;
+      if (!shiftMap[shiftKey]) {
+        shiftMap[shiftKey] = {
+          shift,
+          busNumber: assignment.assignedbusNumber,
+          busId: busId ? busId.toString() : null,
+          assignedDate: assignment.assignedDate,
+          routes: [],
+        };
+      }
+      // Add routes for this assignment
+      if (busId) {
+        const busRoutes = await db.collection("busroutes").find({
+          bus: new mongoose.Types.ObjectId(busId.toString())
+        }).toArray();
+        for (const br of busRoutes) {
+          const route = await db.collection("routes").findOne({ _id: br.route });
+          if (route) {
+            const exists = shiftMap[shiftKey].routes.find(r => r._id === route._id.toString());
+            if (!exists) {
+              shiftMap[shiftKey].routes.push({
+                _id: route._id.toString(),
+                routeId: route.routeId || route._id.toString(),
+                source: route.source,
+                destination: route.destination,
+                busNumber: assignment.assignedbusNumber,
+                busId: busId.toString(),
+                label: `Route ${route.routeId || ""}: ${route.source} → ${route.destination}`,
+              });
+            }
+          }
+        }
+      }
+    }
+    shiftOptions = Object.values(shiftMap);
 
     // Step 9: Create session
     const sessionToken = `${batch_no}_${Date.now()}`;
