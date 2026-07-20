@@ -121,6 +121,7 @@ router.post("/login", async (req, res) => {
       assignedRoute,
       assignedRoutes,
       shift: conductorBus.shift || "",
+      shiftOptions,
       sessionToken,
     });
   } catch (err) {
