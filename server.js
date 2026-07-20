@@ -46,6 +46,16 @@ mongoose.connect(MONGO_URI)
 // Health check
 app.get("/", (req, res) => res.json({ status: "ok", message: "SMT Bus API running" }));
 
+app.get("/check-assignments/:batch_no", async (req, res) => {
+  try {
+    const db = require("mongoose").connection.db;
+    const assignments = await db.collection("conductor_bus").find({ batch_no: req.params.batch_no }).toArray();
+    res.json({ success: true, count: assignments.length, assignments: assignments.map(a => ({ shift: a.shift, assignedDate: a.assignedDate, busNumber: a.assignedbusNumber })) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/update-pos-device", async (req, res) => {
   try {
     const db = require("mongoose").connection.db;
