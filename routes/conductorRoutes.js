@@ -120,6 +120,7 @@ router.post("/login", async (req, res) => {
       busId: conductorBus.busId ? conductorBus.busId.toString() : null,
       assignedRoute,
       assignedRoutes,
+      shift: conductorBus.shift || "",
       sessionToken,
     });
   } catch (err) {
