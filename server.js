@@ -92,7 +92,7 @@ td{padding:6px;border-bottom:1px solid #eee;}
 <body>
 <div class="card">
   <div class="header">
-    <h2>🚌 SMT City Bus Service</h2>
+    <h2>SMT City Bus Service</h2>
     <p>Ticket Verification</p>
   </div>
   <div style="text-align:center">
