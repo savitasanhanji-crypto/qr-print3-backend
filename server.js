@@ -123,6 +123,20 @@ td{padding:6px;border-bottom:1px solid #eee;}
   }
 });
 
+app.get("/api/pos-serial/:deviceId", async (req, res) => {
+  try {
+    const db = require("mongoose").connection.db;
+    const pos = await db.collection("posmachines").findOne({ deviceId: req.params.deviceId });
+    if (pos && pos.serialNumber) {
+      res.json({ success: true, serialNumber: pos.serialNumber });
+    } else {
+      res.json({ success: false, serialNumber: "" });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get("/check-assignments/:batch_no", async (req, res) => {
   try {
     const db = require("mongoose").connection.db;
