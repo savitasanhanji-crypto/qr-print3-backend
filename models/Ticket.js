@@ -23,5 +23,6 @@ const ticketSchema = new mongoose.Schema({
   date: { type: String },
   time: { type: String },
   status: { type: String, default: "confirmed" },
+  shift: { type: String, default: "" },
 });
 module.exports = mongoose.model("Ticket", ticketSchema, "Ticket");
